@@ -1,0 +1,52 @@
+using Azure.Messaging.ServiceBus;
+using IntegrationTests;
+using Microsoft.Extensions.Logging;
+
+namespace Payout.Framework.System.Tests;
+
+public class AzureServiceBusEmulatorIntegrationTests : IClassFixture<AzureServiceBusEmulatorTestFixture>
+{
+    private readonly string _serviceBusConnectionString;
+    private readonly AzureServiceBusEmulatorTestFixture _fixture;
+    private readonly ILogger _logger;
+    private readonly ServiceBusClient _client;
+    private readonly ServiceBusSender _sender;
+    private readonly ServiceBusReceiver _receiver;
+
+    public AzureServiceBusEmulatorIntegrationTests(AzureServiceBusEmulatorTestFixture fixture)
+    {
+        _fixture = fixture;
+        _logger = fixture.GetLoggerFactory().CreateLogger<AzureServiceBusEmulatorIntegrationTests>();
+        _serviceBusConnectionString = fixture.ServiceBusConnectionString ?? throw new InvalidOperationException("Connection string is not set.");
+        _client = new ServiceBusClient(_serviceBusConnectionString);
+        _sender = _client.CreateSender("myqueue");
+        _receiver = _client.CreateReceiver("myqueue");
+    }
+
+    [Fact]
+    public async Task Give__A_Message_Is_Sent_On_A_AzureServiceBusQueue__When_Received__Then_The_Received_Message_Is_Same_As_Sent_Message()
+    {
+        try
+        {
+            const string helloServiceBus = "Hello, Anchita!";
+            var message = new ServiceBusMessage(helloServiceBus);
+
+            await _sender.SendMessageAsync(message); 
+
+            Console.WriteLine("Sent message to Service Bus: " + helloServiceBus);
+
+            var receivedMessage = await _receiver.ReceiveMessageAsync()
+                .ConfigureAwait(true);
+
+            Console.WriteLine("Sent message to Service Bus: " + helloServiceBus);
+
+            Assert.Equal(helloServiceBus, receivedMessage.Body.ToString());
+        }
+
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred in Test1.");
+            throw;
+        }
+    }
+}
